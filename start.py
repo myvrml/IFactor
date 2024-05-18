@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-23 18:27:50
-LastEditTime: 2024-05-08 09:27:52
+LastEditTime: 2024-05-15 11:13:40
 LastEditors: Van Sun
 Description: 
 FilePath: \IFactor\start.py
@@ -79,7 +79,7 @@ from saveDataToArcticDB import writeDB,writeDaily_basic,writeTrade_cal,writeSusp
 #                     from_storage_df[from_storage_df['ts_code']==code]
 #                     #先判断stock_price中是否有code这只股票,已经有了就跳过
 #                     if len(from_storage_df) == 0:
-#                         df = ts.pro_bar(ts_code=code, adj='hfq', start_date=begin, end_date=end)
+#                         df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
 #                         result_df = df[['trade_date','ts_code', 'close']].sort_values(by=['trade_date'],ascending=True)
                         
 #                         #开始对时间轴，把close往后移一个交易日
@@ -91,7 +91,7 @@ from saveDataToArcticDB import writeDB,writeDaily_basic,writeTrade_cal,writeSusp
 #                     else:
 #                         print('相同代码'+code)
 #                 else:
-#                     df = ts.pro_bar(ts_code=code, adj='hfq', start_date=begin, end_date=end)
+#                     df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
 #                     # df = pro.stk_factor(ts_code=code, start_date=begin, end_date=end, \
 #                     #     fields='ts_code,trade_date,pct_change')
 #                     result_df = df[['trade_date','ts_code', 'close']].sort_values(by=['trade_date'],ascending=True)
@@ -115,19 +115,19 @@ def stock_price(tushare_connection, arc_connection, begin, end):
             from_storage_df[from_storage_df['ts_code']==code]
             #先判断stock_price中是否有code这只股票,已经有了就跳过
             if len(from_storage_df) == 0:
-                df = ts.pro_bar(ts_code=code, adj='hfq', start_date=begin, end_date=end)
+                df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
                 if df is None:
                     print(code+" 无行情数据.")
                 else:
                     if df.empty:
                         print(code+" 无行情数据.")
                     else:
-                        result_df = df[['trade_date','ts_code', 'close']].sort_values(by=['trade_date'],ascending=True)
+                        result_df = df[['trade_date','ts_code', 'open', 'high', 'low', 'close','vol']].sort_values(by=['trade_date'],ascending=True)
                         
-                        #开始对时间轴，把close往后移一个交易日
-                        aList = np.array(result_df['close'][1:])
-                        aList = np.append(aList,aList[-1])
-                        result_df['close'] = aList
+                        #如果是alphalengs回测需要对时间轴，把close往后移一个交易日,如果用BT回测就不需要后移一天
+                        # aList = np.array(result_df['close'][1:])
+                        # aList = np.append(aList,aList[-1])
+                        # result_df['close'] = aList
                         result_df['trade_date'] = result_df['trade_date'].apply(lambda x:dt.datetime.strptime(x,'%Y%m%d')).values
                         # result_df.set_index(['trade_date','ts_code'],inplace=True)
                         arc_connection.append('stock_price', result_df)
@@ -135,23 +135,24 @@ def stock_price(tushare_connection, arc_connection, begin, end):
             else:
                 print('相同代码'+code)
         else:
-            df = ts.pro_bar(ts_code=code, adj='hfq', start_date=begin, end_date=end)
+            df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
             # df = pro.stk_factor(ts_code=code, start_date=begin, end_date=end, \
             #     fields='ts_code,trade_date,pct_change')
-            if df.empty:
+            if df is None:
                 print(code+" 无行情数据.")
             else:
-                result_df = df[['trade_date','ts_code', 'close']].sort_values(by=['trade_date'],ascending=True)
-                # result_df['close'] = result_df['pct_change'].expanding().apply(lambda x:np.prod(x/100+1)).values
-                #开始对时间轴，把close往后移一个交易日
-                aList = np.array(result_df['close'][1:])
-                aList = np.append(aList,aList[-1])
-                result_df['close'] = aList
+                result_df = df[['trade_date','ts_code', 'open', 'high', 'low', 'close','vol']].sort_values(by=['trade_date'],ascending=True)
+                        
+                #如果是alphalengs回测需要对时间轴，把close往后移一个交易日,如果用BT回测就不需要后移一天
+                # aList = np.array(result_df['close'][1:])
+                # aList = np.append(aList,aList[-1])
+                # result_df['close'] = aList
                 result_df['trade_date'] = result_df['trade_date'].apply(lambda x:dt.datetime.strptime(x,'%Y%m%d')).values
                 # result_df.set_index(['trade_date','ts_code'],inplace=True)
                 writeDB(arc_connection,'stock_price', result_df)
                 print('创建数据表stock_price:'+code+'已存入数据库.')    
     return True
+
 if __name__ == "__main__":
     #建立本地数据库,数据量很大
     ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
@@ -162,8 +163,9 @@ if __name__ == "__main__":
     ts.set_token(environ.get("TUSHARE_TOKEN"))
     pro = ts.pro_api()  
     # 以下每一步都需要很长时间,建议分段手动执行
-    writeTrade_cal(library, begin)
-    writeSuspend_d(library, begin, end)
-    factor_basic(pro,library,begin,end)
+    # writeTrade_cal(library, begin)
+    # writeSuspend_d(library, begin, end)
+    # factor_basic(pro,library,begin,end)
+    # library.delete('stock_price') 
     stock_price(pro,library,begin,end)
-    factor_finance_indicator(pro, library, begin, end)
+    # factor_finance_indicator(pro, library, begin, end)

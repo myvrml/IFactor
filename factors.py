@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-25 17:31:19
-LastEditTime: 2024-05-07 20:34:26
+LastEditTime: 2024-05-08 23:25:24
 LastEditors: Van Sun
 Description: 清洗数据并生成factors: 总市值, EB, EP, ROE,
 FilePath: \IFactor\factors.py
@@ -33,7 +33,7 @@ def factor_basic(tushare_connection, arc_connection, begin, end):
     for single_date in range((end_date - start_date).days + 1):
         #先判断这一天是否是交易日
         current_date = start_date + timedelta(days=single_date)
-        if isTradingDay(library,current_date): 
+        if isTradingDay(arc_connection,current_date): 
             stockBasicList = getStockPoolAndBasic(tushare_connection,current_date.strftime('%Y%m%d'),\
                 size_threshold=200000)#取出未停牌且市值大于20亿元的股票
             stockBasicList.dropna(axis=0, how='any', inplace=True)#剔除空值,空值多半是亏损的股票

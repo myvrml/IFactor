@@ -42,6 +42,21 @@ p-value(IC)	0.000	0.000	0.000
 IC Skew	0.112	0.168	0.162
 IC Kurtosis	0.166	-0.462	-0.483
 
+Simulated trading(keep updating)
+Portpolio name: IFactor
+Open position on April 22th, 2024
+Trade details:
+![alt text](recode20240422-1.PNG)
+![alt text](recode20240422-2.PNG)
+![alt text](recode20240422-3.PNG)
+![alt text](recode20240422-4.PNG)
+![alt text](recode20240422-5.PNG)
+
+Performance from April 22th, 2024 to May 17th, 2024
+![alt text](Performance20240517.PNG)
+
+
+
 To do:
 1. Find more factors for A-share.
 2. How to run deep learning model with my poor computer?

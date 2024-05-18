@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-28 15:26:00
-LastEditTime: 2024-05-08 00:52:04
+LastEditTime: 2024-05-11 15:22:53
 LastEditors: Van Sun
 Description: Q4 paper:Hou, Xue, and Zhang (2015) :Digesting anomalies: An investment approach
             四因子模型（市场、市值、投资(最近一个财年 total assets 的变化率)以及盈利(ROE,也有人认为毛利率更好)）
@@ -19,6 +19,7 @@ import datetime as dt
 from mytools import *
 from saveDataToArcticDB import writeDB
 import alphalens as al
+import pyfolio as pf
 # 根据百分位去极值
 def winsor(df,factorName: str):
     ceiling = df[factorName].quantile(0.99)
@@ -26,12 +27,28 @@ def winsor(df,factorName: str):
     df.loc[df[factorName] >ceiling,factorName] =ceiling
     df.loc[df[factorName] < floor,factorName] = floor
     return df[factorName]
+
+# df_new.describe().round(2)#对数据进行缩尾处理，并进行标准化
+# def winsor_data(data):
+#     q=data.quantile([0.02,0.98])
+#     data[data<q.iloc[0]]=q.iloc[0]
+#     data[data>q.iloc[1]]=q.iloc[1]
+#     return data
+# #数据标准化
+# def MaxMinNormal(data):
+#     """[0,1] normaliaztion"""
+#     x = (data - data.min()) / (data.max() - data.min())
+#     return x
+# factor=df_new['pe_ttm'].groupby('trade_date').apply(winsor_data)
+# factor_new=factor.groupby('trade_date').apply(MaxMinNormal)
+# factor_new.hist(figsize=(12,6),bins=20)
+
 #取单因子
 def get_factor_data(arc_connection,factor_name: str, begin,end):
     start_date = dt.datetime.strptime(begin,'%Y%m%d')
     end_date = dt.datetime.strptime(end,'%Y%m%d')
     q = QueryBuilder()
-    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=end_date)]#f_turnover_rate_f
+    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=(end_date + dt.timedelta(days=1)))]#f_turnover_rate_f
     from_storage_df = arc_connection.read('factor_basic', \
         columns = ['trade_date', 'ts_code',]+[factor_name], query_builder=q).data
     del q
@@ -42,7 +59,7 @@ def compute_multifactor_data(arc_connection,factor_name1: str, factor_name2: str
     start_date = dt.datetime.strptime(begin,'%Y%m%d')
     end_date = dt.datetime.strptime(end,'%Y%m%d')
     q = QueryBuilder()
-    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=end_date)]
+    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=(end_date + dt.timedelta(days=1)))]
     list_factor_name = factor_name1.split(',')
     from_factor_basic_df = arc_connection.read('factor_basic', \
         columns = (['trade_date', 'ts_code',]+list_factor_name), query_builder=q).data
@@ -78,21 +95,21 @@ def get_stock_price_data(arc_connection, begin,end):
     start_date = dt.datetime.strptime(begin,'%Y%m%d')
     end_date = dt.datetime.strptime(end,'%Y%m%d')
     q = QueryBuilder()
-    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=end_date)]#close
+    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=(end_date + dt.timedelta(days=1)))]#close
     from_storage_df = arc_connection.read('stock_price',query_builder=q).data
     del q
     return from_storage_df
     
 if __name__ == "__main__":
     ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
-    begin = '20100101'#Backtest from 2010-01-01
+    begin = '20200101'#Backtest from 2010-01-01
     end = '20240424'#Backtest end 2024-04-24
     library = ac['tsData'] 
     pro = ts.pro_api()  
     #单因子测试
     # from_storage_df = library.read('factor_basic').data
     # factor_df = get_factor_data(library,'s_total_mv',begin,end)
-    factor_df = compute_multifactor_data(library,'total_mv,pb','q_factor_investment',begin,end)
+    factor_df = compute_multifactor_data(library,'total_mv,turnover_rate','q_factor_investment',begin,end)
     factor_df.set_index(['trade_date','ts_code'], inplace=True)
     #多因子测试
     
@@ -104,8 +121,13 @@ if __name__ == "__main__":
     factor_result = al.utils.get_clean_factor_and_forward_returns(
         factor=factor_df,
         prices=stock_price_to_alphalens,
-        quantiles=10,
-        periods=(1, 10, 20))
+        quantiles=20,
+        periods=(1, 10, 20),
+        cumulative_returns=False)
+    #单独画1d和20d的LS收益图
+    # ls_factor_returns = al.performance.factor_returns(factor_result)
+    # al.plotting.plot_cumulative_returns(ls_factor_returns[1])
+    # al.plotting.plot_cumulative_returns(ls_factor_returns[20],period=20)
     #一种简化版的报告，省去了图表，只有统计信息
     # al.tears.create_summary_tear_sheet(factor_result, long_short=True, group_neutral=False)
     # factor_returns = al.performance.factor_returns(factor_result)
@@ -157,3 +179,17 @@ if __name__ == "__main__":
     #                                      group_neutral=False,
     #                                      std_bar=False,
     #                                      by_group=False)
+    
+    #用Pyfolio做回测
+    # pf_returns, pf_positions, pf_benchmark = al.performance.create_pyfolio_input(factor_result,
+    #                                            period='20D',
+    #                                            long_short=False,
+    #                                            group_neutral=False,
+    #                                            equal_weight=True,
+    #                                            quantiles=[1,20],
+    #                                            groups=None,
+    #                                            benchmark_period='1D')
+
+    # pf.tears.create_full_tear_sheet(pf_returns,
+    #                                  positions=pf_positions,
+    #                                  benchmark_rets=pf_benchmark)
