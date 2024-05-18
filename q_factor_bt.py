@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-05-11 18:15:36
-LastEditTime: 2024-05-18 16:31:37
+LastEditTime: 2024-05-18 17:23:30
 LastEditors: Van Sun
 Description: back testing with Backtrader
 FilePath: \IFactor\q_factor_bt.py
@@ -94,7 +94,7 @@ class TestStrategy(bt.Strategy):
         self.trade_dates = get_all_rebalance_days(21, begin=begin, end=end)
         s_df = pd.DataFrame()
         for day in self.trade_dates:
-            factor_df = compute_multifactor_data(library,'total_mv,turnover_rate',\
+            factor_df = compute_multifactor_data(library,'total_mv,pb',\
                 'q_factor_investment',day,day)
             #对factor取quantile_num组,然后获得最高一组的所有股票代码
             quantile_num = 20
