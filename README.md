@@ -68,7 +68,7 @@ Trade details:
 ![alt text](recode20240522-6.PNG)
 ![alt text](recode20240522-7.PNG)
 ![alt text](recode20240522-8.PNG)
-
+![alt text](recode20240522-9.PNG)
 
 Performance from April 22th, 2024 to May 23th, 2024
 ![alt text](Performance20240523.PNG)
