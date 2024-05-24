@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-23 18:27:50
-LastEditTime: 2024-05-15 11:13:40
+LastEditTime: 2024-05-24 09:10:45
 LastEditors: Van Sun
 Description: 
 FilePath: \IFactor\start.py
@@ -104,7 +104,7 @@ from saveDataToArcticDB import writeDB,writeDaily_basic,writeTrade_cal,writeSusp
 #                     print('创建数据表stock_price:'+code+'已存入数据库.')
 #     return True
 
-#取出所有正在上市,已退市和暂停上市的股票代码,再取每只股票历史后复权股价
+#取出所有正在上市,已退市和暂停上市的股票代码,再取每只股票历史前复权股价
 def stock_price(tushare_connection, arc_connection, begin, end):
     codeList = getAllStocks(tushare_connection)
     for code in codeList['ts_code']:
@@ -113,27 +113,23 @@ def stock_price(tushare_connection, arc_connection, begin, end):
             q = q[(q['ts_code'] == code) ]
             from_storage_df = arc_connection.read('stock_price',query_builder=q).data
             from_storage_df[from_storage_df['ts_code']==code]
-            #先判断stock_price中是否有code这只股票,已经有了就跳过
-            if len(from_storage_df) == 0:
-                df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
-                if df is None:
+            df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
+            if df is None:
+                print(code+" 无行情数据.")
+            else:
+                if df.empty:
                     print(code+" 无行情数据.")
                 else:
-                    if df.empty:
-                        print(code+" 无行情数据.")
-                    else:
-                        result_df = df[['trade_date','ts_code', 'open', 'high', 'low', 'close','vol']].sort_values(by=['trade_date'],ascending=True)
-                        
-                        #如果是alphalengs回测需要对时间轴，把close往后移一个交易日,如果用BT回测就不需要后移一天
-                        # aList = np.array(result_df['close'][1:])
-                        # aList = np.append(aList,aList[-1])
-                        # result_df['close'] = aList
-                        result_df['trade_date'] = result_df['trade_date'].apply(lambda x:dt.datetime.strptime(x,'%Y%m%d')).values
-                        # result_df.set_index(['trade_date','ts_code'],inplace=True)
-                        arc_connection.append('stock_price', result_df)
-                        print('追加数据表stock_price:'+code+'已存入数据库.')
-            else:
-                print('相同代码'+code)
+                    result_df = df[['trade_date','ts_code', 'open', 'high', 'low', 'close','vol']].sort_values(by=['trade_date'],ascending=True)
+                    
+                    #如果是alphalengs回测需要对时间轴，把close往后移一个交易日,如果用BT回测就不需要后移一天
+                    # aList = np.array(result_df['close'][1:])
+                    # aList = np.append(aList,aList[-1])
+                    # result_df['close'] = aList
+                    result_df['trade_date'] = result_df['trade_date'].apply(lambda x:dt.datetime.strptime(x,'%Y%m%d')).values
+                    # result_df.set_index(['trade_date','ts_code'],inplace=True)
+                    arc_connection.append('stock_price', result_df)
+                    print('追加数据表stock_price:'+code+'已存入数据库.')
         else:
             df = ts.pro_bar(ts_code=code, adj='qfq', start_date=begin, end_date=end)
             # df = pro.stk_factor(ts_code=code, start_date=begin, end_date=end, \
@@ -153,19 +149,43 @@ def stock_price(tushare_connection, arc_connection, begin, end):
                 print('创建数据表stock_price:'+code+'已存入数据库.')    
     return True
 
+def update_table(tushare_connection, arc_connection, table_name, begin, end):
+    if table_name == 'trade_cal':
+        to_append_df = getTrade_cal(begin,end)
+        arc_connection.append("trade_cal", to_append_df)
+        print('trade_cal updated.')
+    if table_name == 'daily_basic':#这个表后面没用到,可以不更新
+        writeDaily_basic(arc_connection,begin,end)
+        print('daily_basic updated.')
+    if table_name == 'suspend_d':#这个表后面没用到,可以不更新
+        writeSuspend_d(arc_connection,begin,end)
+        print('suspend_d updated.')
+    if table_name == 'stock_price':
+        stock_price(tushare_connection,arc_connection,begin,end)
+        print('stock_price updated.')
+    if table_name == 'factor_basic':
+        factor_basic(tushare_connection, arc_connection, begin, end)
+        print('factor_basic updated.')
+    if table_name == 'q_factor_investment':
+        factor_finance_indicator(tushare_connection, arc_connection, begin, end)
+        print('q_factor_investment updated.')
+        
 if __name__ == "__main__":
     #建立本地数据库,数据量很大
-    ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
+    ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=20GB')
     begin = '20050101'#Data from 2005-01-01
     end = '20240424'#
     library = ac.get_library('tsData', create_if_missing=True)
     #https://tushare.pro/register?reg=658542 ,注册Tushare账号,并交费200元以上,200元对应2000积分
     ts.set_token(environ.get("TUSHARE_TOKEN"))
-    pro = ts.pro_api()  
+    pro = ts.pro_api()
     # 以下每一步都需要很长时间,建议分段手动执行
     # writeTrade_cal(library, begin)
     # writeSuspend_d(library, begin, end)
     # factor_basic(pro,library,begin,end)
     # library.delete('stock_price') 
-    stock_price(pro,library,begin,end)
+    # stock_price(pro,library,begin,end)
     # factor_finance_indicator(pro, library, begin, end)
+    update_table(pro,library,'q_factor_investment','20240518','20240523')
+    # from_storage_df = library.read('q_factor_investment').data
+    # print(from_storage_df.head())

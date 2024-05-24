@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-25 17:35:40
-LastEditTime: 2024-05-12 19:27:38
+LastEditTime: 2024-05-24 11:08:52
 LastEditors: Van Sun
 Description: 工具类函数
 FilePath: \IFactor\mytools.py
@@ -58,7 +58,8 @@ def getAllStocks(tushare_connection):
     df2 = tushare_connection.stock_basic(exchange='', list_status='D', fields='ts_code')
     # df3 = tushare_connection.stock_basic(exchange='', list_status='P', fields='ts_code')
     from_storage_df = pd.concat([df1, df2], axis=0)
-    return from_storage_df[['ts_code']]
+    df_unique = from_storage_df.drop_duplicates()
+    return df_unique[['ts_code']]
 
 def get_stock_price_data(arc_connection, begin,end):
     if isinstance(begin, str):
@@ -97,8 +98,12 @@ def compute_multifactor_data(arc_connection,factor_name1: str, factor_name2: str
     from_q_factor_investment_df = arc_connection.read('q_factor_investment', \
         columns = (['trade_date', 'ts_code',]+[factor_name2]), query_builder=q).data
     del q
+    #把factor_basic和q_factor_investment中的ST股全部剔除
+    # for code in from_factor_basic_df['ts_code']:
+        
     sorted_from_factor_basic_df = from_factor_basic_df.sort_values(by=['trade_date','ts_code'],ascending = True)
     sorted_from_q_factor_investment_df = from_q_factor_investment_df.sort_values(by=['trade_date','ts_code'],ascending = True)
+    
     # from_factor_basic_df[factor_name2] = sorted_from_q_factor_investment_df[factor_name2]
     list_factor_name.append(factor_name2)
     group_df = sorted_from_factor_basic_df.groupby('trade_date')

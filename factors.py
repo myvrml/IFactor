@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-25 17:31:19
-LastEditTime: 2024-05-08 23:25:24
+LastEditTime: 2024-05-24 09:11:57
 LastEditors: Van Sun
 Description: 清洗数据并生成factors: 总市值, EB, EP, ROE,
 FilePath: \IFactor\factors.py
@@ -12,7 +12,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from arcticdb import QueryBuilder
 from getTushareData import *
-
+import time as T
 from mytools import *
 from saveDataToArcticDB import writeDB
 from datetime import *; from dateutil.relativedelta import *
@@ -58,13 +58,19 @@ def factor_basic(tushare_connection, arc_connection, begin, end):
 # 1.先计算q_factor中的investment因子
 #里面的因子数据是根据财报数据计算出来的原始值,未做标准化处理
 def factor_finance_indicator(tushare_connection, arc_connection, begin, end):
-    from_storage_df = arc_connection.read('factor_basic',columns=['trade_date','ts_code']).data
+    q = QueryBuilder()
+    start_date = dt.datetime.strptime(begin,'%Y%m%d')
+    end_date = dt.datetime.strptime(end,'%Y%m%d')
+    q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=(end_date + dt.timedelta(days=1)))]#
+    from_storage_df = arc_connection.read('factor_basic', \
+         query_builder=q,columns=['trade_date','ts_code']).data
     sorted_from_storage_df = from_storage_df.sort_values(by=['ts_code','trade_date'],ascending = True)
     group_from_storage_df = from_storage_df.groupby('ts_code')
     list_investment_YoY = []
     for code,group in group_from_storage_df:
-        df = tushare_connection.balancesheet(ts_code=code, start_date=begin, end_date=end, \
+        df = tushare_connection.balancesheet(ts_code=code, start_date='20050101', end_date=end, \
                 fields='ts_code,ann_date,f_ann_date,end_date,report_type,comp_type,total_assets')
+        T.sleep(0.3)#Tushare 规定每分钟查询不能超过200次,所以update的时候要控制一下速度
         df['ann_date'] = df['ann_date'].apply(lambda x:datetime.strptime(x,'%Y%m%d')).values
         df['f_ann_date'] = df['f_ann_date'].apply(lambda x:datetime.strptime(x,'%Y%m%d')).values
         df['end_date'] = df['end_date'].apply(lambda x:datetime.strptime(x,'%Y%m%d')).values
@@ -99,12 +105,19 @@ def factor_finance_indicator(tushare_connection, arc_connection, begin, end):
             list_investment_YoY.append(investment_YoY)
         print(code+'investment因子已计算完成')
     sorted_from_storage_df['q_factor_investment'] = list_investment_YoY
+    #存入到本地ArcticDB
+    if arc_connection.has_symbol('q_factor_investment'):
+        # arc_connection.append('q_factor_investment', sorted_from_storage_df[['ts_code'],['trade_date'],['q_factor_investment']])
+        arc_connection.append('q_factor_investment', sorted_from_storage_df)
+        print('追加数据表q_factor_investment'+current_date.strftime('%Y%m%d')+'已存入数据库.')
+    else:
+        writeDB(arc_connection, 'q_factor_investment', sorted_from_storage_df)
+        print('开始创建q_factor_investment'+current_date.strftime('%Y%m%d')+'已存入数据库.')
     
-    writeDB(arc_connection, 'q_factor_investment', sorted_from_storage_df)
     
         
 # if __name__ == "__main__":
-#     ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
+#     ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=20GB')
 #     begin = '20050101'#Backtest from 2005-01-01
 #     end = '20240424'#Backtest to 2024-04-24
   

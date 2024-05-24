@@ -1,3 +1,12 @@
+<!--
+ * @Author: Van Sun
+ * @Date: 2024-04-24 10:36:04
+ * @LastEditTime: 2024-05-24 18:16:59
+ * @LastEditors: Van Sun
+ * @Description: 
+ * @FilePath: \IFactor\README.md
+ * 
+-->
 **IFactor = AI + Multifacor**
 A multifactor model combinded with machine learning algorithm on China A-shares.
 
@@ -51,10 +60,21 @@ Trade details:
 ![alt text](recode20240422-3.PNG)
 ![alt text](recode20240422-4.PNG)
 ![alt text](recode20240422-5.PNG)
+![alt text](recode20240522-1.PNG)
+![alt text](recode20240522-2.PNG)
+![alt text](recode20240522-3.PNG)
+![alt text](recode20240522-4.PNG)
+![alt text](recode20240522-5.PNG)
+![alt text](recode20240522-6.PNG)
+![alt text](recode20240522-7.PNG)
+![alt text](recode20240522-8.PNG)
 
-Performance from April 22th, 2024 to May 17th, 2024
-![alt text](Performance20240517.PNG)
 
+Performance from April 22th, 2024 to May 23th, 2024
+![alt text](Performance20240523.PNG)
+
+
+CSI500 fell 0.91% on May 24th, but my fortofolio flatted.
 
 
 To do:

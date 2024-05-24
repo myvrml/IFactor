@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-04-23 11:38:02
-LastEditTime: 2024-05-07 15:44:40
+LastEditTime: 2024-05-19 18:24:25
 LastEditors: Van Sun
 Description: 将Tushare数据(账号积分要2000以上,注册地址:https://tushare.pro/register?reg=658542)导入到本地ArcticDB,
              数据量很大,需要时间1-2天,强烈建议手动单步执行此文件.
@@ -15,9 +15,8 @@ from mytools import *
 import datetime as dt
 
 def initDB():
+    ac = adb.Arctic('lmdb://./data/IFactorDB/database??map_size=20GB')
     ac.create_library('tsData')
-    
-
     
 def writeDB(dataBase, tableName: str, dataFrame):
     dataBase.write(tableName, dataFrame)
@@ -105,7 +104,7 @@ def writePro_bar(dataBase, begin: str, end: str):
                 print('开始创建daily_basic'+current_date.strftime('%Y%m%d')+'已存入数据库.')        
 
 #在本地建立数据库文件,初始化文件大小为40G,是的,即便是日频数据量也很大...
-# ac = adb.Arctic('lmdb://./data/IFactorDB/database??map_size=50GB')
+# ac = adb.Arctic('lmdb://./data/IFactorDB/database??map_size=20GB')
 # begin = '20050101'#Backtest from 2005-01-01
 # end = '20240424'#Backtest to 2024-04-24
 # library = ac['tsData']    

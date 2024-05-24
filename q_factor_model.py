@@ -101,7 +101,7 @@ def get_stock_price_data(arc_connection, begin,end):
     return from_storage_df
     
 if __name__ == "__main__":
-    ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
+    ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=20GB')
     begin = '20200101'#Backtest from 2010-01-01
     end = '20240424'#Backtest end 2024-04-24
     library = ac['tsData'] 

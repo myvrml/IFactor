@@ -1,7 +1,7 @@
 '''
 Author: Van Sun
 Date: 2024-05-11 18:15:36
-LastEditTime: 2024-05-18 17:23:30
+LastEditTime: 2024-05-24 17:45:01
 LastEditors: Van Sun
 Description: back testing with Backtrader
 FilePath: \IFactor\q_factor_bt.py
@@ -19,14 +19,14 @@ from saveDataToArcticDB import writeDB
 import backtrader as bt # 导入 Backtrader
 import backtrader.indicators as btind # 导入策略分析模块
 import backtrader.feeds as btfeeds # 导入数据模块
-ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
+ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=20GB')
 library = ac['tsData'] 
 pro = ts.pro_api()  
 # 实例化 cerebro
 cerebro = bt.Cerebro(stdstats=False)
 #取股价
-begin = datetime.datetime(2024, 3, 29)#Backtest from 2010-01-01
-end = datetime.datetime(2024, 4, 24)#Backtest end 2024-04-24
+begin = datetime.datetime(2015, 1, 19)#Backtest from 2010-01-01
+end = datetime.datetime(2024, 5, 23)#Backtest end 2024-04-24
 daily_price = get_stock_price_data(library, begin,end)
 # daily_price = []
 # trade_info = pd.read_csv("result.csv", parse_dates=['date'])
@@ -91,7 +91,7 @@ class TestStrategy(bt.Strategy):
     def __init__(self):
         #开始计算所有的调仓日期:每月的rebalance_day号,如果未开市则后延到下一个交易日
         #回测时，会在这一天下单，然后在下一个交易日，以开盘价买入
-        self.trade_dates = get_all_rebalance_days(21, begin=begin, end=end)
+        self.trade_dates = get_all_rebalance_days(22, begin=begin, end=end)
         s_df = pd.DataFrame()
         for day in self.trade_dates:
             factor_df = compute_multifactor_data(library,'total_mv,pb',\
@@ -121,7 +121,7 @@ class TestStrategy(bt.Strategy):
             # 提取当前调仓日的持仓列表
             buy_stocks_data = self.buy_stock.query(f"trade_date=='{dt}'")
             long_list = buy_stocks_data['sec_code'].tolist()
-            buy_stocks_data.to_csv('I3Factor_position.csv')
+            buy_stocks_data.to_csv('I3Factor_position.csv', sep=',',mode='a',index = False)
             # print('long_list', long_list)  # 打印持仓列表
             # 对现有持仓中，调仓后不再继续持有的股票进行卖出平仓
             sell_stock = [i for i in self.buy_stocks_pre if i not in long_list]
@@ -178,7 +178,7 @@ class TestStrategy(bt.Strategy):
 # 初始资金 10,000,000
 cerebro.broker.setcash(10000000.0)
 # 佣金，双边各 0.001
-cerebro.broker.setcommission(commission=0.001)
+cerebro.broker.setcommission(commission=0.002)
 # 滑点：双边各 0.0005
 cerebro.broker.set_slippage_perc(perc=0.001)
 
@@ -205,6 +205,22 @@ daily_return.to_csv('dailyReturn.csv')
 # print(strat.analyzers._SharpeRatio.get_analysis())
 # print("--------------- DrawDown -----------------")
 # print(strat.analyzers._DrawDown.get_analysis())
-
-
 # cerebro.plot()
+
+# 添加 PyFolio 分析器
+# cerebro.addanalyzer(bt.analyzers.PyFolio, _name='pyfolio')
+# results = cerebro.run()
+# strat = results[0]
+# # 一次性获取 4 个子分析器的计算结果
+# pyfoliozer = strat.analyzers.getbyname('pyfolio')
+# returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
+# returns.to_csv('dailyReturn.csv')
+# # 利用 Quantoption 的 Pyfolio 模块来绘制图形
+# # 需要提前安装好该模块 pip install pyfolio==0.5.1
+# import pyfolio as pf
+# pf.create_full_tear_sheet(
+#     returns,
+#     positions=positions,
+#     transactions=transactions,
+#     slippage=0.002,
+#     round_trips=False)

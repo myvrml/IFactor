@@ -6,7 +6,7 @@ import datetime
 import pandas as pd
 from saveDataToArcticDB import writeDB,writeDaily_basic,writeTrade_cal,writeSuspend_d
 
-ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=50GB')
+ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=20GB')
 
 library = ac.get_library('tsData', create_if_missing=True)
 #https://tushare.pro/register?reg=658542 ,注册Tushare账号,并交费200元以上,200元对应2000积分
