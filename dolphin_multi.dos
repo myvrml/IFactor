@@ -1,0 +1,15 @@
+login("admin","123456")
+dbPath="dfs://tushare"
+yearRange=date(2008.01M + 12*0..22)
+if(existsDatabase(dbPath)){
+    dropDatabase(dbPath)
+}
+columns1=`ts_code`trade_date`open`high`low`close`pre_close`change`pct_change`vol`amount
+type1=`SYMBOL`NANOTIMESTAMP`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE
+db=database(dbPath,RANGE,yearRange)
+hushen_daily_line=db.createPartitionedTable(table(100000000:0,columns1,type1),`hushen_daily_line,`trade_date)
+​
+​
+columns2=`ts_code`trade_date`close`turnover_rate`turnover_rate_f`volume_ratio`pe`pe_ttm`pb`ps`ps_ttm`dv_ratio`dv_ttm`total_share`float_share`free_share`total_mv`circ_mv
+type2=`SYMBOL`NANOTIMESTAMP`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE`DOUBLE
+hushen_daily_indicator1=db.createPartitionedTable(table(100000000:0,columns2,type2),`hushen_daily_indicator,`trade_date)

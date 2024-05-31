@@ -1,0 +1,73 @@
+// dropDatabase("dfs://dayFactorDB")
+db = database("dfs://dayFactorDB")
+dropTable(db,"factor_basic")
+//为提高效率建议两个数据库dayFactorDB存放因子,k_day_level存放交易数据
+create database "dfs://dayFactorDB" 
+partitioned by RANGE(date(datetimeAdd(2015.01M,0..25*12,'M'))), VALUE(`f1`f2), 
+engine='TSDB'
+
+create table "dfs://dayFactorDB"."factor_basic"(
+    trade_date DATE[comment="时间列", compress="delta"], 
+    ts_code SYMBOL, 
+    pe DOUBLE,
+    pb DOUBLE,
+    gpr DOUBLE,
+    npr DOUBLE,
+    total_mv DOUBLE,
+    turn_over DOUBLE,
+    vol_ratio DOUBLE,
+    strength DOUBLE,
+    roe DOUBLE
+)
+partitioned by trade_date, ts_code,
+sortColumns=[`ts_code, `trade_date]
+create table "dfs://dayFactorDB"."factor_computed"(
+    trade_date DATE[comment="时间列", compress="delta"], 
+    ts_code SYMBOL, 
+    value DOUBLE, 
+    factorname SYMBOL
+)
+partitioned by trade_date, factorname,
+sortColumns=[`ts_code, `trade_date], 
+keepDuplicates=ALL, 
+sortKeyMappingFunction=[hashBucket{, 500}]
+
+create database "dfs://k_day_level"
+partitioned by RANGE(2005.01M + (0..35)*12)
+engine='OLAP'
+
+create table "dfs://k_day_level"."k_day"(
+	ts_code SYMBOL  
+	trade_date TIMESTAMP
+	open DOUBLE   
+    high DOUBLE        
+	low DOUBLE     
+	close DOUBLE     
+	vol DOUBLE
+)
+partitioned by trade_date
+
+create table "dfs://k_day_level"."trade_cal"(
+	exchange SYMBOL  
+	cal_date TIMESTAMP
+	is_open INT   
+    pretrade_date TIMESTAMP        
+)
+partitioned by cal_date
+
+create table "dfs://k_day_level"."suspend_d"(
+	ts_code SYMBOL  
+	trade_date TIMESTAMP
+	suspend_type SYMBOL          
+)
+partitioned by trade_date
+
+create table "dfs://k_day_level"."company_detail"(
+	ts_code SYMBOL  
+	trade_date TIMESTAMP
+	name SYMBOL 
+    industry SYMBOL    
+    list_date  TIMESTAMP    
+)
+partitioned by trade_date
+

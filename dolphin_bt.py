@@ -1,16 +1,14 @@
 '''
 Author: Van Sun
 Date: 2024-05-11 18:15:36
-LastEditTime: 2024-05-24 21:37:45
+LastEditTime: 2024-05-31 08:48:00
 LastEditors: Van Sun
 Description: back testing with Backtrader
-FilePath: \IFactor\q_factor_bt.py
+FilePath: \IFactor\dolphin_bt.py
 
 '''
-import arcticdb as adb
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from arcticdb import QueryBuilder
 from getTushareData import *
 import datetime 
 from dateutil.relativedelta import *
@@ -19,14 +17,16 @@ from saveDataToArcticDB import writeDB
 import backtrader as bt # 导入 Backtrader
 import backtrader.indicators as btind # 导入策略分析模块
 import backtrader.feeds as btfeeds # 导入数据模块
-ac = adb.Arctic('lmdb://./data/IFactorDB/database?map_size=20GB')
-library = ac['tsData'] 
+import dolphindb as ddb
+library = ddb.session()
+library.connect("localhost", 8848, "admin", "123456")
+
 pro = ts.pro_api()  
 # 实例化 cerebro
 cerebro = bt.Cerebro(stdstats=False)
 #取股价
-begin = datetime.datetime(2015, 1, 19)#Backtest from 2010-01-01
-end = datetime.datetime(2024, 5, 23)#Backtest end 2024-04-24
+begin = datetime.datetime(2021, 12, 20)#
+end = datetime.datetime(2024, 5, 23)#
 daily_price = get_stock_price_data(library, begin,end)
 # daily_price = []
 # trade_info = pd.read_csv("result.csv", parse_dates=['date'])
@@ -94,7 +94,7 @@ class TestStrategy(bt.Strategy):
         self.trade_dates = get_all_rebalance_days(22, begin=begin, end=end)
         s_df = pd.DataFrame()
         for day in self.trade_dates:
-            factor_df = compute_multifactor_data(library,'total_mv,turnover_rate,dv_ratio',\
+            factor_df = compute_multifactor_data(library,'total_mv,turn_over,strength',\
                 'q_factor_investment',day,day)
             #对factor取quantile_num组,然后获得最高一组的所有股票代码
             quantile_num = 20
@@ -178,7 +178,7 @@ class TestStrategy(bt.Strategy):
 # 初始资金 10,000,000
 cerebro.broker.setcash(10000000.0)
 # 佣金，双边各 0.001
-cerebro.broker.setcommission(commission=0.002)
+cerebro.broker.setcommission(commission=0.001)
 # 滑点：双边各 0.0005
 cerebro.broker.set_slippage_perc(perc=0.001)
 
@@ -224,3 +224,4 @@ daily_return.to_csv('dailyReturn.csv')
 #     transactions=transactions,
 #     slippage=0.002,
 #     round_trips=False)
+library.close()

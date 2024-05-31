@@ -1,10 +1,10 @@
 '''
 Author: Van Sun
 Date: 2024-04-25 17:35:40
-LastEditTime: 2024-05-30 13:55:13
+LastEditTime: 2024-05-30 13:57:34
 LastEditors: Van Sun
 Description: 工具类函数
-FilePath: \IFactor\mytools.py
+FilePath: \IFactor\mytools - backup.py
 
 '''
 import dolphindb as ddb
@@ -44,12 +44,10 @@ def getStockPoolAndBasic(TushareConnection: any, tradingDay: any, size_threshold
         from_storage_df.dropna(axis=0, how='any', inplace=True)#剔除空值和0值
         #剔除'000043.SZ',这个票Tushare数据有错误
         from_storage_df=from_storage_df[~(from_storage_df['ts_code']=='000043.SZ')]
-        #剔除st和新股,北交所
+        #剔除st和新股
         from_storage_df=from_storage_df[~(from_storage_df['name'].apply(lambda x:x.startswith('*ST')))]
         from_storage_df=from_storage_df[~(from_storage_df['name'].apply(lambda x:x.startswith('ST')))]
         from_storage_df=from_storage_df[~(from_storage_df['name'].apply(lambda x:x.startswith('N')))]
-        from_storage_df=from_storage_df[~(from_storage_df['name'].apply(lambda x:x.startswith('8')))]
-        from_storage_df=from_storage_df[~(from_storage_df['name'].apply(lambda x:x.startswith('43')))]
         #剔除上市一年以内的新股次新股
         from_storage_df=from_storage_df[from_storage_df['list_date'].\
             apply(lambda x:(dt.datetime.strptime(tradingDay,'%Y%m%d')-dt.datetime.strptime(x,'%Y%m%d')).days>365)]
@@ -93,8 +91,8 @@ def get_stock_price_data(dolphin_connection, begin,end):
     if isinstance(end, str):
         end = dt.datetime.strptime(end,'%Y%m%d')
     tb = dolphin_connection.table(dbPath="dfs://k_day_level", data="k_day")
-    from_storage_df = tb.select("*").where(f"trade_date>={begin.strftime('%Y.%m.%d')} and "\
-        f"trade_date<={end.strftime('%Y.%m.%d')}").toDF()
+    from_storage_df = tb.select("trade_date,ts_code").where(f"trade_date>={begin.strftime('%Y.%m.%d')} and "\
+        "trade_date<={end.strftime('%Y.%m.%d')}").toDF()
     return from_storage_df
 # def get_stock_price_data(dolphin_connection, begin,end):
 #     if isinstance(begin, str):
@@ -114,53 +112,49 @@ def winsor(df,factorName: str):
     df.loc[df[factorName] < floor,factorName] = floor
     return df[factorName]
 #将多因子合成一个单因子,未来要改造成深度学习算法
-def compute_multifactor_data(dolphin_connection,factor_name1: str, factor_name2: str,begin,end):
-    scaler = StandardScaler()
-    if isinstance(begin,str):
-        start_date = dt.datetime.strptime(begin,'%Y%m%d')
-    else:
-        start_date = begin
-    if isinstance(end,str):
-        end_date = dt.datetime.strptime(end,'%Y%m%d')
-    else:
-        end_date = end
-    tb_factor_basic = dolphin_connection.table(dbPath="dfs://dayFactorDB", data="factor_basic")
-    list_factor_name = factor_name1.split(',')
-    
-    from_factor_basic_df = tb_factor_basic.select(f"trade_date,ts_code,{factor_name1}").\
-        where(f"trade_date>={start_date.strftime('%Y.%m.%d')} and "\
-        f"trade_date<={end_date.strftime('%Y.%m.%d')}").toDF()
+# def compute_multifactor_data(dolphin_connection,factor_name1: str, factor_name2: str,begin,end):
+#     scaler = StandardScaler()
+#     if isinstance(begin,str):
+#         start_date = dt.datetime.strptime(begin,'%Y%m%d')
+#     else:
+#         start_date = begin
+#     if isinstance(end,str):
+#         end_date = dt.datetime.strptime(end,'%Y%m%d')
+#     else:
+#         end_date = end
+#     q = QueryBuilder()
+#     q = q[ (q['trade_date']>=start_date)& (q['trade_date']<=(end_date + dt.timedelta(days=1)))]
+#     list_factor_name = factor_name1.split(',')
+#     from_factor_basic_df = dolphin_connection.read('factor_basic', \
+#         columns = (['trade_date', 'ts_code',]+list_factor_name), query_builder=q).data
+#     from_q_factor_investment_df = dolphin_connection.read('q_factor_investment', \
+#         columns = (['trade_date', 'ts_code',]+[factor_name2]), query_builder=q).data
+#     del q
+#     #把factor_basic和q_factor_investment中的ST股全部剔除
+#     # for code in from_factor_basic_df['ts_code']:
         
-    tb_q_factor_investment = dolphin_connection.table(dbPath="dfs://dayFactorDB", data="factor_computed")
+#     sorted_from_factor_basic_df = from_factor_basic_df.sort_values(by=['trade_date','ts_code'],ascending = True)
+#     sorted_from_q_factor_investment_df = from_q_factor_investment_df.sort_values(by=['trade_date','ts_code'],ascending = True)
     
-    from_q_factor_investment_df = tb_q_factor_investment.select("trade_date,ts_code,value").\
-        where(f"trade_date>={start_date.strftime('%Y.%m.%d')} and "\
-            f"trade_date<={end_date.strftime('%Y.%m.%d')} and "\
-            f"factorname='{factor_name2}'").toDF()
-    from_q_factor_investment_df.rename(columns={'value': factor_name2}, inplace=True)    
-    sorted_from_factor_basic_df = from_factor_basic_df.sort_values(by=['trade_date','ts_code'],ascending = True)
-    sorted_from_q_factor_investment_df = from_q_factor_investment_df.sort_values(by=['trade_date','ts_code'],ascending = True)
-    
-    # from_factor_basic_df[factor_name2] = sorted_from_q_factor_investment_df[factor_name2]
-    list_factor_name.append(factor_name2)
-    group_df = sorted_from_factor_basic_df.groupby('trade_date')
-    list_compounded_factor = []
-    #按天来计算因子
-    for currentdate,group in group_df:
-        group[factor_name2] = sorted_from_q_factor_investment_df[factor_name2]\
-            [sorted_from_q_factor_investment_df['trade_date']==currentdate]
-        group[factor_name2] = group[factor_name2].apply(lambda x:-x)#根据因子特性来决定:对factor_name2取负数
+#     # from_factor_basic_df[factor_name2] = sorted_from_q_factor_investment_df[factor_name2]
+#     list_factor_name.append(factor_name2)
+#     group_df = sorted_from_factor_basic_df.groupby('trade_date')
+#     list_compounded_factor = []
+#     #按天来计算因子
+#     for currentdate,group in group_df:
+#         group[factor_name2] = sorted_from_q_factor_investment_df[factor_name2]\
+#             [sorted_from_q_factor_investment_df['trade_date']==currentdate]
+#         group[factor_name2] = group[factor_name2].apply(lambda x:-x)#根据因子特性来决定:对factor_name2取负数
+#         #去极值
+#         for name in list_factor_name:
+#             winsor(group,name)
+#         #标准化
+#         standardized_factor = scaler.fit_transform(group[list_factor_name])
+#         #这里直接每个因子等权来合成, 未来要改造成DL
+#         mean_factor = np.mean(standardized_factor, axis =1)
+#         # standardized_factor = scaler.fit_transform(np.array(stockBasicList['total_mv']).reshape(-1, 1))
+#         list_compounded_factor = np.concatenate((list_compounded_factor, mean_factor))
         
-        #去极值
-        for name in list_factor_name:
-            winsor(group,name)
-        #标准化
-        standardized_factor = scaler.fit_transform(group[list_factor_name])
-        #这里直接每个因子等权来合成, 未来要改造成DL
-        mean_factor = np.mean(standardized_factor, axis =1)
-        # standardized_factor = scaler.fit_transform(np.array(stockBasicList['total_mv']).reshape(-1, 1))
-        list_compounded_factor = np.concatenate((list_compounded_factor, mean_factor))
-        
-    result_df = sorted_from_factor_basic_df[['trade_date','ts_code']]
-    result_df['compounded_q_factor'] = list_compounded_factor
-    return result_df
+#     result_df = sorted_from_factor_basic_df[['trade_date','ts_code']]
+#     result_df['compounded_q_factor'] = list_compounded_factor
+#     return result_df
